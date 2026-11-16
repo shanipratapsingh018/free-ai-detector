@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1f4d3a">
+  <title>Free AI Detector — check, humanize, and refine your writing</title>
+  <meta name="description" content="Check whether text resembles AI-generated writing with a dedicated detector, then humanize, proofread, simplify, or summarize it — your original stays untouched.">
+  <link rel="icon" href="mark.svg" type="image/svg+xml">
+  <link rel="preload" href="vendor/fonts/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+  <symbol id="i-feather" viewBox="0 0 24 24"><path d="M20 4c-7 0-12 5-12 12v4M8 16h6c3 0 6-3 6-6M8 12h8"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19c0-8 5-14 14-14 0 9-6 14-14 14Zm0 0 7-7"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h7M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4m-4.5 4.5L12 4l4.5 4.5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></symbol>
+  <symbol id="i-paste" viewBox="0 0 24 24"><path d="M9 4h6v3H9zM8 5.5H6a1 1 0 0 0-1 1V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6.5a1 1 0 0 0-1-1h-2"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M4 19h16"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4m0 0h11l-2 4 2 4H5"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.8 19.5h18.4zM12 10v4.5M12 17h.01"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M8.5 13h7M8.5 17h5"/></symbol>
+</svg>
+
+<a class="skip-link" href="#editor">Skip to the text editor</a>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="#top" aria-label="Free AI Detector, back to top">
+      <img src="mark.svg" width="34" height="34" alt="">
+      <span>Free AI Detector</span>
+    </a>
+    <nav aria-label="Main">
+      <ul>
+        <li><a href="#workspace">AI Detector</a></li>
+        <li><a href="#how-it-works">How It Works</a></li>
+        <li><a href="#faqs">FAQs</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero wrap" aria-labelledby="hero-title">
+    <h1 id="hero-title">Check your writing. <em>Then make it yours.</em></h1>
+    <p class="lede">Get a score from a dedicated AI-text detector with a plain-language explanation — then humanize, proofread, simplify, or summarize. Your original always stays untouched.</p>
+  </section>
+
+  <section id="workspace" class="workspace wrap" aria-labelledby="workspace-title">
+    <h2 id="workspace-title" class="visually-hidden">Writing workspace</h2>
+
+    <div class="modebar" role="radiogroup" aria-label="Choose a tool">
+      <button type="button" role="radio" class="mode" data-mode="detect" aria-checked="true"><svg aria-hidden="true"><use href="#i-search"/></svg>AI Detector</button>
+      <button type="button" role="radio" class="mode" data-mode="humanize" aria-checked="false" tabindex="-1"><svg aria-hidden="true"><use href="#i-feather"/></svg>Humanize</button>
+      <button type="button" role="radio" class="mode" data-mode="grammar" aria-checked="false" tabindex="-1"><svg aria-hidden="true"><use href="#i-check"/></svg>Fix Grammar</button>
+      <button type="button" role="radio" class="mode" data-mode="simplify" aria-checked="false" tabindex="-1"><svg aria-hidden="true"><use href="#i-leaf"/></svg>Simplify</button>
+      <button type="button" role="radio" class="mode" data-mode="summarize" aria-checked="false" tabindex="-1"><svg aria-hidden="true"><use href="#i-list"/></svg>Summarize</button>
+    </div>
+
+    <div class="panels">
+      <!-- Editor -->
+      <div class="panel editor-panel">
+        <div class="panel-head">
+          <label for="editor" class="panel-title">Your text</label>
+          <div class="tools">
+            <button type="button" class="btn-ghost" id="paste-btn"><svg aria-hidden="true"><use href="#i-paste"/></svg>Paste</button>
+            <button type="button" class="btn-ghost" id="upload-btn"><svg aria-hidden="true"><use href="#i-upload"/></svg>Upload</button>
+            <button type="button" class="btn-ghost" id="clear-btn"><svg aria-hidden="true"><use href="#i-x"/></svg>Clear</button>
+          </div>
+          <input type="file" id="file-input" class="visually-hidden" tabindex="-1" aria-hidden="true"
+                 accept=".txt,.md,.markdown,.pdf,.docx,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+        </div>
+
+        <div id="restore-bar" class="restore-bar" role="status" hidden>
+          <span id="restore-msg"></span>
+          <button type="button" class="btn-link" id="restore-btn"><svg aria-hidden="true"><use href="#i-undo"/></svg><span id="restore-label">Restore my text</span></button>
+          <button type="button" class="icon-btn" id="restore-dismiss" aria-label="Dismiss"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+        </div>
+
+        <div class="editor-body" id="drop-zone">
+          <textarea id="editor" spellcheck="true" aria-describedby="limits-hint input-msg"
+            placeholder="Paste or type your text here — or drop a .txt, .md, .pdf, or .docx file."></textarea>
+          <div class="drop-overlay" aria-hidden="true"><svg><use href="#i-file"/></svg><span>Drop your file to extract its text</span></div>
+        </div>
+
+        <div class="samples">
+          <span class="samples-label">Try an example:</span>
+          <button type="button" class="chip" data-sample="casual">Example · casual personal style</button>
+          <button type="button" class="chip" data-sample="polished">Example · generic polished style</button>
+        </div>
+
+        <div class="editor-foot">
+          <div class="counts">
+            <span id="word-count">0 words</span><span aria-hidden="true">·</span><span id="char-count">0 characters</span>
+          </div>
+          <span id="limits-hint" class="limits-hint">AI Detector: 50–2,500 words, up to 20,000 characters</span>
+          <div class="meter" aria-hidden="true"><div id="meter-fill"></div></div>
+          <p id="input-msg" class="input-msg" hidden></p>
+          <div class="submit-row">
+            <p id="provider-note" class="provider-note"></p>
+            <button type="button" class="btn-primary" id="run-btn"><span id="run-label">Check for AI</span><svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <section class="panel results-panel" id="results" aria-labelledby="results-title" aria-busy="false">
+        <div class="panel-head">
+          <h3 id="results-title" class="panel-title">Result</h3>
+          <span id="results-status" class="status-chip" data-tone="idle">Waiting for text</span>
+        </div>
+        <div id="results-body" class="results-body" tabindex="-1"></div>
+      </section>
+    </div>
+    <p class="workspace-foot"><svg aria-hidden="true"><use href="#i-info"/></svg>Text is sent only when you press the action button, and only to the provider that performs it. We don’t store it. <button type="button" class="btn-link" data-dialog="privacy">Privacy details</button></p>
+  </section>
+
+  <!-- Future ad placement A (below the workspace). Intentionally empty and hidden: no live or mock ads. -->
+  <aside class="ad-slot wrap" data-ad-slot="below-workspace" aria-label="Advertisement" hidden></aside>
+
+  <section id="how-it-works" class="section wrap" aria-labelledby="how-title">
+    <div class="section-head">
+      <h2 id="how-title">How it works</h2>
+      <p>Three steps. No account.</p>
+    </div>
+    <ol class="steps">
+      <li><span class="step-n">1</span><h3>Add your text</h3><p>Paste, type, or upload a .txt, .md, .pdf, or .docx file. You review the extracted text before anything is checked.</p></li>
+      <li><span class="step-n">2</span><h3>Check it</h3><p>The AI Detector sends your text to GPTZero, a dedicated detection service, and explains what its numbers mean.</p></li>
+      <li><span class="step-n">3</span><h3>Refine and compare</h3><p>Optionally humanize, fix grammar, simplify, or summarize. Compare every change with your original, then copy or download.</p></li>
+    </ol>
+  </section>
+
+  <section id="method" class="section wrap method" aria-labelledby="method-title">
+    <div class="section-head">
+      <h2 id="method-title">Method &amp; limitations</h2>
+      <p>What the numbers mean — and what they can’t tell you.</p>
+    </div>
+    <div class="method-grid">
+      <article class="card">
+        <h3>The detector</h3>
+        <p>Scores come from <strong>GPTZero’s API</strong>, a model trained to classify documents as <em>human</em>, <em>mixed</em>, or <em>AI</em>. We show the three <strong>class probabilities</strong> it returns, its confidence category, and the detector version.</p>
+        <p>A class probability is the detector’s estimated likelihood that a label fits the <em>whole document</em>. GPTZero describes the probability for the predicted class as the chance its prediction is correct on similar documents. It is <strong>not</strong> the percentage of words written by AI.</p>
+        <p>We never compute a score ourselves. If the detector is unavailable, you’ll see “Score unavailable” — never a substitute number.</p>
+      </article>
+      <article class="card">
+        <h3>The writing tools</h3>
+        <p>Humanize, Fix Grammar, Simplify, and Summarize use a general-purpose language model (OpenAI or Anthropic, depending on how this site is configured). Each mode has narrow instructions: preserve meaning, facts, names, numbers, and quotations; don’t add claims.</p>
+        <p>Language models still make mistakes. Always compare the revision with your original. Humanize aims for natural phrasing — it is not a way to evade detectors, and we make no promise about how any detector will score the result.</p>
+      </article>
+      <article class="card card-accent">
+        <h3>What no detector can do</h3>
+        <ul class="ticks">
+          <li>Prove who wrote a text, or prove that someone used AI.</li>
+          <li>Reliably identify which AI tool or model was used.</li>
+          <li>Judge short passages, lists, code, poetry, or heavily edited text with confidence.</li>
+          <li>Avoid false positives — human writing, especially formal or non-native English writing, can be flagged.</li>
+        </ul>
+        <p>Use a result as one signal for a conversation, never as the sole basis for academic, hiring, or disciplinary decisions.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Future ad placement B (within supporting content). Intentionally empty and hidden. -->
+  <aside class="ad-slot wrap" data-ad-slot="supporting-content" aria-label="Advertisement" hidden></aside>
+
+  <section id="faqs" class="section wrap" aria-labelledby="faq-title">
+    <div class="section-head">
+      <h2 id="faq-title">FAQs</h2>
+      <p>Straight answers.</p>
+    </div>
+    <div class="faq-list">
+      <details><summary>What does the AI score mean?</summary><div><p>You’ll see three numbers from GPTZero: the probability that the document as a whole is human-written, mixed (part human, part AI), or AI-generated. They add up to about 100%. The highest one is the detector’s prediction. A 70% “AI” probability does <strong>not</strong> mean 70% of the words came from AI.</p></div></details>
+      <details><summary>Can this prove someone used ChatGPT or another AI?</summary><div><p>No. Detectors estimate how closely text resembles patterns seen in AI-generated writing. They make mistakes in both directions and cannot identify the specific tool. Treat any result as a prompt for discussion, not evidence.</p></div></details>
+      <details><summary>Will Humanize make my text pass AI detectors?</summary><div><p>We don’t promise that, and you shouldn’t rely on it. Humanize asks a language model for natural phrasing with conservative edits that keep your meaning. You can check the revision with the detector yourself — that’s a separate, explicit action.</p></div></details>
+      <details><summary>Does a revision replace my original?</summary><div><p>No. Your original stays in the editor. Revisions appear in the results panel, where you can compare changes, copy, or download them. If you choose “Use as my text”, you can restore the original with one click.</p></div></details>
+      <details><summary>Which files can I upload?</summary><div><p>.txt and .md (up to 2 MB), and .pdf and .docx (up to 10 MB). Text is extracted in your browser, and you review it before using it. Password-protected files and scanned (image-only) PDFs can’t be read — paste the text instead. Up to 2,500 words or 20,000 characters can be processed at once.</p></div></details>
+      <details><summary>Is my text stored?</summary><div><p>This site doesn’t store or log your text. When you run a tool, the text passes through our server to the one provider that performs it — GPTZero for detection, or the configured language-model provider for writing tools. Their own policies then apply; see <button type="button" class="btn-link" data-dialog="privacy">Privacy</button>. Avoid submitting confidential or personal information.</p></div></details>
+      <details><summary>Is it really free?</summary><div><p>Yes, there’s no account or payment. The site owner pays the providers, so there are fair-use limits per minute and per day. If a limit is reached, you’ll see a clear message.</p></div></details>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <a class="brand" href="#top"><img src="mark.svg" width="28" height="28" alt=""><span>Free AI Detector</span></a>
+    <p class="footer-note">Detection by GPTZero’s API. Writing tools by a third-party language model. Not affiliated with either provider.</p>
+    <ul class="footer-links">
+      <li><button type="button" class="btn-link" data-dialog="privacy">Privacy</button></li>
+      <li><button type="button" class="btn-link" data-dialog="terms">Terms</button></li>
+      <li><button type="button" class="btn-link" data-dialog="contact">Contact</button></li>
+    </ul>
+  </div>
+</footer>
+
+<!-- Announcements for assistive technology -->
+<div id="announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+
+<!-- File review dialog -->
+<dialog id="review-dialog" aria-labelledby="review-title" aria-describedby="review-meta">
+  <form method="dialog" class="dialog-inner">
+    <div class="dialog-head">
+      <h2 id="review-title">Review extracted text</h2>
+      <button type="submit" value="cancel" class="icon-btn" aria-label="Cancel and close"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+    </div>
+    <p id="review-meta" class="muted"></p>
+    <ul id="review-warnings" class="warnings"></ul>
+    <label for="review-text" class="field-label">Extracted text — edit if needed</label>
+    <textarea id="review-text" rows="12"></textarea>
+    <p id="review-counts" class="muted small"></p>
+    <div class="dialog-actions">
+      <button type="submit" value="cancel" class="btn-ghost">Cancel</button>
+      <button type="submit" value="append" class="btn-secondary" id="review-append">Add to end</button>
+      <button type="submit" value="replace" class="btn-primary" id="review-replace">Use this text</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Info dialog (privacy, terms, contact, report) -->
+<dialog id="info-dialog" aria-labelledby="info-title">
+  <div class="dialog-inner">
+    <div class="dialog-head">
+      <h2 id="info-title"></h2>
+      <button type="button" class="icon-btn" id="info-close" aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+    </div>
+    <div id="info-body" class="prose"></div>
+  </div>
+</dialog>
+
+<template id="t-privacy">
+  <p><strong>Short version:</strong> we don’t keep your text. It goes only where it must to perform the action you choose.</p>
+  <h3>What happens to your text</h3>
+  <ul>
+    <li><strong>Typing, uploading, and file extraction</strong> happen in your browser. Uploaded files are never sent to our server; only text you submit is.</li>
+    <li><strong>AI Detector:</strong> your text is sent through our server to <a href="https://gptzero.me/privacy-policy.html" target="_blank" rel="noopener noreferrer">GPTZero</a>. GPTZero states that text submitted through its API is not stored by default nor used for product improvement.</li>
+    <li><strong>Humanize, Fix Grammar, Simplify, Summarize:</strong> your text is sent through our server to the configured language-model provider (<a href="https://openai.com/policies/privacy-policy/" target="_blank" rel="noopener noreferrer">OpenAI</a> or <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener noreferrer">Anthropic</a>). OpenAI requests use <code>store: false</code>. Providers may still retain API data for a limited time for abuse and safety monitoring under their own policies.</li>
+    <li><strong>Our server</strong> doesn’t log or store submitted text or results. To enforce fair-use limits, it briefly holds your IP address in memory (about a minute).</li>
+    <li><strong>Hosting:</strong> the site runs on Cloudflare, which processes ordinary request metadata (such as IP address) under its own policy.</li>
+    <li>No cookies, analytics, advertising, or browser storage are used. Reloading the page clears your text and results.</li>
+  </ul>
+  <p>Please don’t submit confidential, sensitive, or other people’s personal information.</p>
+</template>
+
+<template id="t-terms">
+  <ul>
+    <li>This service is provided free, as is, without warranties. It may be unavailable or limited at any time.</li>
+    <li>AI-detection results are probabilistic estimates from a third-party detector. They can be wrong and cannot establish authorship. Don’t use them as the sole basis for decisions about people.</li>
+    <li>Revisions are generated by a language model and may contain errors or change meaning. You are responsible for reviewing and using them.</li>
+    <li>Only submit text you have the right to process. Don’t use the service to deceive others, violate academic or workplace rules, or break the law.</li>
+    <li>Fair-use limits apply. Automated or bulk use is not permitted.</li>
+    <li>Use is also subject to the third-party providers’ terms.</li>
+  </ul>
+</template>
+
+<template id="t-contact">
+  <p>This project is maintained on GitHub. For questions, problems, or feedback, please open an issue:</p>
+  <p><a href="https://github.com/shanipratapsingh018/free-ai-detector/issues" target="_blank" rel="noopener noreferrer">github.com/shanipratapsingh018/free-ai-detector/issues</a></p>
+  <p class="muted">Don’t include text you want to keep private in a public issue.</p>
+</template>
+
+<template id="t-report">
+  <p>Think a result is wrong or a revision changed your meaning? Thanks for flagging it.</p>
+  <ul>
+    <li><strong>Detector results</strong> come from GPTZero. Download the report, then contact GPTZero or open an issue here describing the problem. The report includes the detector version but not your text unless you choose to include it.</li>
+    <li><strong>Revisions</strong> come from a language model. Describe what went wrong in an issue — please don’t paste private text.</li>
+  </ul>
+  <p><a href="https://github.com/shanipratapsingh018/free-ai-detector/issues/new" target="_blank" rel="noopener noreferrer">Open an issue on GitHub</a></p>
+</template>
+</body>
+</html>

@@ -1,83 +1,168 @@
-# Free AI Detector — Humanizer & Pattern Analysis
+# Free AI Detector
 
-Two separate tools: a real server-backed rewrite adapter and an experimental local pattern analyzer. **Rewriting needs an owner-configured OpenAI API key; no key is currently provisioned.** The UI visibly disables rewriting until configured. It does not substitute an example or make fake rewrites.
+A writing workspace: paste or upload text, check it with a **dedicated AI-text detector (GPTZero API)**, read an honest explanation of the score, then optionally **Humanize, Fix Grammar, Simplify, or Summarize** with a language model (OpenAI or Anthropic). The original is never replaced without an explicit action, and every revision can be compared, copied, downloaded, or checked with the detector again.
 
-## Run and check
+- Plain HTML/CSS/JS frontend (no framework), served by **Cloudflare Workers Static Assets**.
+- A small Worker backend (`/api/*`) holds all provider keys and enforces validation, limits, timeouts and rate limits.
+- No database, no cookies, no analytics, no browser storage, no logging of submitted text.
 
-Node.js 18+ is required for checks and the dependency-free build:
+> **Status:** the code is complete and tested with mocked providers. **Live provider calls have not been verified yet** because no API keys are configured. Until they are, the site shows “Score unavailable” and “Writing tools unavailable”. It never shows a substitute number.
+
+---
+
+## Features
+
+| Area | Details |
+| --- | --- |
+| Tools | AI Detector · Humanize · Fix Grammar · Simplify · Summarize (radio group; results kept per tool for the same text) |
+| Input | Large editor, Paste (Clipboard API with fallback message), Clear (with Undo), Upload, drag-and-drop, Ctrl/⌘+Enter |
+| Files | `.txt`, `.md` (≤ 2 MB), `.pdf`, `.docx` (≤ 10 MB). Text is extracted **in the browser**, and you review and edit it in a dialog before inserting (Replace or Add to end). |
+| File errors | Unsupported types, legacy `.doc`, oversized files, non-UTF-8 text, binary files, password-protected PDF/DOCX, image-only (scanned) PDFs, damaged files, and PDF engine load failures each get a specific message. Failed uploads never touch the editor. |
+| Limits | 20,000 characters / 2,500 words. Detector ≥ 50 words, Summarize ≥ 60, other tools ≥ 5. Live word/character counts and meter. The same limits are enforced by the server (`public/limits.js` is shared). |
+| Samples | Clearly labelled “Example · …”. Loading one keeps your text and shows **Restore my text**. |
+| Detector result | GPTZero’s predicted class and confidence category, its own result message, **separate Human / Mixed / AI class probabilities**, highlighted sentences, detector version, timestamp, plain-language explanation and limitations. Copy summary, Download report (your text only if you opt in), Report a problem. |
+| Revisions | Inline word diff, side-by-side, or revision-only views. Warns when numbers from the original are missing. Copy, Download .txt, **Use as my text** (with Restore original), **Check revision for AI** (explicit; never automatic). |
+| States | Empty, validation, loading (with Cancel), success, unavailable (“Score unavailable”), timeout, rate-limited, error, and “text changed”. |
+| Stale safety | Each request is tied to an input version. Editing aborts in-flight requests, clears results, and ignores late responses. |
+| Accessibility | Semantic landmarks, labelled controls, roving-tabindex radio group, tabs with arrow keys, native `<dialog>` with focus return, live-region announcements, visible focus rings, reduced-motion and forced-colors support. axe-core scan has no serious or critical violations. |
+| Ads | Two empty, hidden `<aside class="ad-slot">` placeholders (below the workspace, and between supporting sections). No ad code. |
+
+## What the detector score means (and doesn’t)
+
+GPTZero’s `/v2/predict/text` returns `predicted_class` (`human` | `mixed` | `ai`), `class_probabilities` for each class, a `confidence_category`, a `result_message`, and the detector `version`. GPTZero describes the probability for the predicted class as the chance its prediction is correct on similar documents. The UI:
+
+- shows the three probabilities separately and labels them as **whole-document class probabilities, not the share of words written by AI**;
+- never computes, rounds into a single “AI %”, or estimates a score locally or with a language model;
+- ignores deprecated fields such as `completely_generated_prob`;
+- says that results can’t prove authorship or identify which AI tool was used;
+- shows **“Score unavailable”** whenever the detector is disconnected, errors, times out, or returns a malformed response. The server validates the response shape: probabilities must be numbers in [0, 1] that sum to about 1, and the class must be known.
+
+---
+
+## Project layout
+
+```
+public/              Static site (deployed as-is)
+  index.html         Markup, dialogs, privacy/terms/contact templates
+  styles.css         Ivory / forest / sage design system, mobile-first
+  app.js             Workspace controller (state, requests, rendering)
+  extract.js         TXT/MD/DOCX (built-in ZIP reader) + PDF (pdf.js) extraction
+  diff.js            Word-level LCS diff
+  limits.js          Limits + validation shared by browser and Worker
+  _headers           CSP and security headers
+  vendor/            (generated by `npm run build`: pdf.js + self-hosted fonts; git-ignored)
+worker/
+  index.js           Router: /api/status, /api/detect, /api/revise?mode=…
+  http.js            JSON helpers, capped body reader, timeouts, sanitized provider errors
+  ratelimit.js       Cloudflare Rate Limiting binding + in-memory fallback + daily caps
+  detector/gptzero.js   Detector adapter (separate from language models)
+  llm/openai.js         OpenAI Responses API adapter (store:false)
+  llm/anthropic.js      Anthropic Messages API adapter
+  llm/prompts.js        Per-mode instructions
+  llm/index.js          Adapter selection + output validation
+tests/
+  unit/              node:test — Worker (mocked providers), extraction, diff, limits, markup
+  e2e/               Playwright against `wrangler dev` (provider calls mocked in-browser)
+  fixtures/          Real PDF, image-only PDF, AES-encrypted PDF, LibreOffice DOCX, encrypted DOCX
+```
+
+## Local setup
+
+Requires Node.js 20+.
 
 ```sh
-npm test
-npm run check
+npm ci
+npm run build            # copies pdf.js + fonts into public/vendor
+cp .env.example .dev.vars # optional: add keys locally (file is git-ignored)
+npm run dev              # wrangler dev → http://localhost:8787
+```
+
+Without keys, the app runs normally and shows the “unavailable” states.
+
+### Tests
+
+```sh
+npm test                 # unit + mocked-provider integration tests (no network)
+npx playwright install chromium   # once
+npm run test:e2e         # starts wrangler dev and runs browser tests (no paid calls)
+npm run deploy:dry       # validates wrangler config and bundle without deploying
+```
+
+---
+
+## API accounts and keys
+
+You need **two separate API accounts**. A ChatGPT Plus/Pro or Claude Pro/Max subscription does **not** include API usage for a website. API usage is billed separately on each provider’s developer platform.
+
+### 1. Detector: GPTZero API (required for scores)
+
+1. Sign in at <https://app.gptzero.me> and open the **API** page (<https://app.gptzero.me/app/api>). API access requires an API subscription plan, and quotas are counted in words. Review the plan and pricing yourself before subscribing.
+2. Create an API key there. Don’t paste it into chat, issues, or code.
+3. Store it as a secret (see “Storing secrets” below) under the name `GPTZERO_API_KEY`.
+
+Optional: `GPTZERO_MODEL_VERSION` pins a detector version for comparable results. `GPTZERO_MULTILINGUAL=true` uses GPTZero’s multilingual model. GPTZero docs say not to combine the two, so the version wins if both are set.
+
+### 2. Language model: OpenAI or Anthropic (required for the writing tools)
+
+Choose one:
+
+- **OpenAI:** create a project and key at <https://platform.openai.com/api-keys>. Add billing under *Settings → Billing*, and set a **monthly budget / usage limit** for the project. Secret name: `OPENAI_API_KEY`. Optional: `OPENAI_MODEL` (default `gpt-6.1-terra`) and `OPENAI_REASONING_EFFORT`.
+- **Anthropic:** create a key at <https://platform.claude.com> (Console → API keys). Add credits and set a **spend limit**. Secret name: `ANTHROPIC_API_KEY`. Optional: `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`).
+
+If both keys exist, OpenAI is used unless `LLM_PROVIDER=anthropic`. Model defaults were chosen from the providers’ model listings in November 2026. Confirm that your account can use them, or set the model variable.
+
+### Storing secrets
+
+- **Production (Cloudflare):** `npx wrangler secret put GPTZERO_API_KEY` (and likewise for the LLM key). Wrangler prompts for the value, so it never appears in shell history, Git, or logs. You can also use the dashboard: *Workers & Pages → free-ai-detector → Settings → Variables and Secrets → Add → Type: Secret*.
+- **Local:** put values in `.dev.vars` (git-ignored).
+- `.env.example` contains **names only**. Keys are only read inside `worker/`. They are never sent to the browser, included in reports, or logged. Tests assert this.
+
+### Cost and abuse controls
+
+| Control | Where |
+| --- | --- |
+| Per-IP rate limit, 6 requests/min/route | Cloudflare Rate Limiting binding `RATE_LIMITER` (in `wrangler.jsonc`). Falls back to an in-memory, per-isolate limiter (`RATE_LIMIT_PER_MINUTE`). |
+| Daily request caps | `DAILY_DETECT_LIMIT`, `DAILY_REVISE_LIMIT` (default 300 each). **Best-effort per isolate.** It is not a global guarantee. |
+| Kill switches | `DETECTOR_ENABLED=false`, `WRITER_ENABLED=false` |
+| Size limits | 100 KB request body (streamed check), 20,000 chars / 2,500 words, per-mode minimums |
+| Timeouts | Detector 30 s (`DETECTOR_TIMEOUT_MS`), language model 60 s (`LLM_TIMEOUT_MS`), browser 90 s |
+| Output limits | `LLM_MAX_OUTPUT_TOKENS` (8000). Revisions with implausible length are discarded. |
+| Origin check | `/api/detect` and `/api/revise` require a same-origin `Origin` header |
+| **Hard spending cap** | Set it **in each provider dashboard** (OpenAI project budget, Anthropic spend limit, GPTZero plan quota). This is the only real ceiling. |
+
+For a public launch, consider adding Cloudflare Turnstile and WAF rate-limit rules.
+
+## Deploy (Cloudflare Workers)
+
+```sh
+npm ci
 npm run build
+npx wrangler login                     # opens a browser; your Cloudflare account
+npx wrangler secret put GPTZERO_API_KEY
+npx wrangler secret put OPENAI_API_KEY # or ANTHROPIC_API_KEY
+npx wrangler deploy
 ```
 
-For static UI inspection only:
+Then verify:
 
-```sh
-python3 -m http.server 3000 --directory dist
-```
+1. `curl https://<your-worker>.workers.dev/api/status` should show `"available": true` for both detector and writer.
+2. In the browser, load an example, run **Check for AI**, and confirm the detector version is shown.
+3. Run **Humanize** and **Summarize** once each, and review the output.
+4. Check that the response headers include `content-security-policy`.
 
-The Python preview cannot rewrite because it has no API server. Deploy `dist/server/index.js` to a Cloudflare Worker-compatible host, or run a local Worker development tool with a private environment secret. Never place an API key in `dist/`, source, shell arguments, or Git. On Sites, use its supported secret configuration workflow. For `OPENAI_API_KEY`, enable OpenAI Developers and follow its `openai-platform-api-key` skill and approval flow. Do not paste a key into chat. Keep the Site private until provider billing, abuse controls, legal text, and public access are reviewed.
+The `ratelimits` binding requires a Workers plan where Rate Limiting is available. If deploy rejects it, remove the block. The in-memory fallback still applies.
 
-## Runtime configuration
+## Privacy (matches actual behavior)
 
-- `OPENAI_API_KEY` — required server-side secret for actual rewriting.
-- `OPENAI_MODEL` — optional server-side model name; defaults to `gpt-4.1-mini`.
+- File extraction happens in the browser. Files are never uploaded.
+- Text is sent only when you press an action button, and only to the provider for that action: GPTZero for detection, or the configured LLM for writing tools.
+- GPTZero states that API submissions are not stored by default or used for product improvement. OpenAI requests use `store: false`. Providers may still keep API data for limited abuse monitoring under their own policies.
+- The Worker doesn’t log or store request bodies or results. Rate limiting keeps the client IP in memory for about one minute. Cloudflare processes normal request metadata.
+- No cookies, analytics, ads, or browser storage.
 
-A paid provider account with available quota is required. The site owner pays model usage; no payments are collected in this app. The private preview's hosting login is separate from the app, which has no account system.
+## Known limitations / not yet verified
 
-## How rewriting works
-
-`GET /api/status` returns readiness only. `POST /api/rewrite` accepts 5–1,500 words and at most 100,000 characters in a same-origin JSON request. The server validates streamed request size, checks input, and calls OpenAI Responses with `store:false`, a timeout, and conservative copy-editing instructions. Incomplete or radically shorter/longer output is rejected. Provider errors and timeouts preserve the user's original.
-
-The original stays in the editor; a revision appears beside it on desktop and below on mobile. Copy and download controls act only on the revision. Editing input or switching tools aborts pending browser requests and invalidates old results. Aborting a browser request does not guarantee cancellation of provider processing or billing. Meaning preservation is an instruction, not a guarantee; the user must review facts and details. There is no promise of passing or evading an AI detector.
-
-Human/AI-style sample buttons are explicitly labeled as examples. A separate Restore my text action restores the pre-sample original. Loading a sample does not humanize text.
-
-## Local pattern analysis
-
-This mode remains fully local and requires no key. It supports 50–1,500 words, measures word and sentence counts, unique words, and repeated trigrams, and exports an explanatory report without the original text. It is **not** a trained AI detector and never invents an AI percentage or accuracy claim.
-
-Both tools support live word counting, clipboard fallback, clear, .txt uploads up to 100 KB, UTF-8/binary validation, non-destructive errors, keyboard use, and responsive layouts.
-
-## Source map
-
-- `dist/index.html`, `dist/styles.css`: responsive ivory/forest/sage UI.
-- `dist/app.js`: input, modes, async cancellation, results, sample restoration, legal dialogs.
-- `dist/engine.js`: pure local analysis functions and report export.
-- `worker/index.js`: server-only model adapter and HTTP handling.
-- `scripts/build.mjs`: embeds static assets and adapter into `dist/server/index.js`.
-- `tests/`: count/validation tests, markup integrity checks, and mocked server integration tests.
-
-`npm run build` must be rerun after frontend or adapter changes. The build output contains no API secrets.
-
-## Privacy
-
-Pattern analysis never transmits text. Rewriting sends submitted text to the site server and OpenAI. This app stores no submissions or text logs and does not use browser persistence. `store:false` does not eliminate all provider retention or abuse monitoring. Google Fonts and hosting services receive ordinary network requests and may keep access metadata. Updated privacy and terms dialogs disclose this behavior. Avoid submitting sensitive material. A public support address still needs configuration.
-
-## Verification
-
-Engine, markup, syntax, and mocked rewrite integration checks pass. Live model behavior is unverified until a real key is configured. Browser-control tools are unavailable in this environment, so responsive rendering and interaction testing remain unverified. Test 390px, 768px, and 1440px widths, 200% zoom, keyboard-only operation, uploads and paste denied, mode changes during requests, sample restoration, errors, and copy/download before a public launch. Review actual rewrite quality with factual/numeric passages after connecting the model.
-
-## AdSense and design research
-
-Two hidden, empty placement hooks remain below the workspace and between supporting content sections. There are no live ads, mock ads, or approval claims. Public monetization needs policy review, unobtrusive placement, appropriate consent/disclosures, and abuse/cost controls.
-
-GPTZero, QuillBot AI detector, and ZeroGPT public page content informed the original editor-first design. Branding, mark, wording, and layout are original. No reference accuracy statistics or testimonials were copied.
-
-
-## Repository status
-
-This repository contains the last tested, deployed implementation: a working browser-local writing-pattern demo and a server-side OpenAI rewrite adapter. Twelve automated checks passed for this implementation before export. The local analyzer does not provide an AI probability. Actual rewriting requires a configured API key and paid provider quota. No credentials are included.
-
-The latest detector-first visual redesign, real detector percentage integration, PDF/DOCX upload support, and additional grammar/simplify/summarize actions are pending work and are not represented as completed features in this version.
-
-## Deploy independently to Cloudflare Workers
-
-1. Run `npm run build`.
-2. Use `npx wrangler login` to authenticate your Cloudflare account.
-3. Use `npx wrangler secret put OPENAI_API_KEY` to enter a key securely when you are ready to enable rewriting. Do not put keys in code or Git.
-4. Run `npx wrangler deploy`.
-
-The included `wrangler.jsonc` points to the generated Worker. Provider billing is separate from ChatGPT or Claude subscriptions. No live provider request has been verified for this repository.
+- **Live GPTZero, OpenAI, and Anthropic calls are unverified** until keys are configured. The adapters follow the current official docs and are covered by mocked tests.
+- No OCR: scanned PDFs are rejected with an explanation.
+- Daily caps are per Worker isolate. Rely on provider-side spending limits for hard ceilings.
+- A contact email isn’t configured. The Contact dialog points to GitHub Issues.

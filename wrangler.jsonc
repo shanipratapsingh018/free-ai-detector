@@ -1,5 +1,24 @@
 {
+  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "free-ai-detector",
-  "main": "dist/server/index.js",
-  "compatibility_date": "2026-11-16"
+  "main": "worker/index.js",
+  "compatibility_date": "2026-11-01",
+  // Static site from ./public (run `npm run build` first to copy pdf.js and fonts into public/vendor).
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/*"]
+  },
+  // Cloudflare Rate Limiting binding: per client IP + route. namespace_id is any account-unique integer string.
+  "ratelimits": [
+    { "name": "RATE_LIMITER", "namespace_id": "4801", "simple": { "limit": 6, "period": 60 } }
+  ],
+  // Non-secret settings. Secrets (GPTZERO_API_KEY, OPENAI_API_KEY / ANTHROPIC_API_KEY) are set with
+  // `npx wrangler secret put NAME` — never here.
+  "vars": {
+    "DAILY_DETECT_LIMIT": "300",
+    "DAILY_REVISE_LIMIT": "300"
+  },
+  "observability": { "enabled": false }
 }

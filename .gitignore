@@ -9,3 +9,6 @@ dist/server/
 *.zip
 *.tar.gz
 .DS_Store
+public/vendor/
+test-results/
+playwright-report/
