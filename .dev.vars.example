@@ -1,0 +1,3 @@
+# Copy to .dev.vars for `npx wrangler dev`, or export these before `npm start`. Never commit real keys.
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1-mini

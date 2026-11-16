@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#214e3c">
+<title>Free AI Detector — Score, humanize and tidy any text</title>
+<meta name="description" content="Paste any text to get an AI-likeness score with sentence-by-sentence highlights, then humanize, fix grammar, simplify or summarize it. Scoring runs in your browser.">
+<meta property="og:title" content="Free AI Detector">
+<meta property="og:description" content="AI-likeness score with sentence highlights, plus humanize, grammar, simplify and summarize tools. No sign-up.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="mark.svg">
+<link rel="icon" href="mark.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/dm-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="styles.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+  <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5h16v-5"/></symbol>
+  <symbol id="icon-paste" viewBox="0 0 24 24"><path d="M9 5H5v16h14V5h-4M9 3h6v5H9z"/></symbol>
+  <symbol id="icon-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6zM8 12l3 3 5-6"/></symbol>
+  <symbol id="icon-download" viewBox="0 0 24 24"><path d="M12 3v13m-5-5 5 5 5-5M4 17v4h16v-4"/></symbol>
+  <symbol id="icon-spark" viewBox="0 0 24 24"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></symbol>
+  <symbol id="icon-copy" viewBox="0 0 24 24"><path d="M9 9h11v11H9zM5 15H4V4h11v1"/></symbol>
+</svg>
+<a class="skip" href="#text-input">Skip to text editor</a>
+
+<header class="header">
+  <a class="brand" href="./" aria-label="Free AI Detector home"><img src="mark.svg" width="34" height="34" alt=""><span>Free AI Detector<span class="brand-dot">.</span></span></a>
+  <nav aria-label="Main navigation"><a href="#tool">Detector</a><a href="#how-it-works">How it works</a><a href="#method">Method</a><a href="#faqs">FAQs</a></nav>
+  <span class="header-note"><span class="status-dot"></span>Free. No sign-up.</span>
+</header>
+
+<main>
+<section class="hero" aria-labelledby="headline">
+  <p class="eyebrow">SCORE IT. READ WHY. IMPROVE IT.</p>
+  <h1 id="headline">Check any text.<br>Then make it <em>read better.</em></h1>
+  <p class="hero-copy">Get an AI-likeness score with the reasons behind it, sentence by sentence. Then humanize, proofread, simplify or summarize the same text.</p>
+</section>
+
+<section id="tool" class="tool" aria-label="Text workspace">
+  <div class="tabs" role="group" aria-label="Choose a tool">
+    <button type="button" data-action="detect" aria-pressed="true">Detect AI</button>
+    <button type="button" data-action="humanize" aria-pressed="false">Humanize</button>
+    <button type="button" data-action="grammar" aria-pressed="false">Fix grammar</button>
+    <button type="button" data-action="simplify" aria-pressed="false">Simplify</button>
+    <button type="button" data-action="summarize" aria-pressed="false">Summarize</button>
+    <span class="engine-note" id="engine-note" role="status">Scoring runs on this device.</span>
+  </div>
+
+  <div class="workspace">
+    <div class="panel editor-panel">
+      <div class="panel-head">
+        <label for="text-input">Your text</label>
+        <div class="panel-actions">
+          <button type="button" id="paste" class="quiet"><svg><use href="#icon-paste"/></svg>Paste</button>
+          <button type="button" id="upload" class="quiet"><svg><use href="#icon-upload"/></svg>Upload</button>
+          <button type="button" id="clear" class="quiet">Clear</button>
+        </div>
+      </div>
+      <input type="file" id="file" accept=".txt,.md,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+      <textarea id="text-input" aria-describedby="guidance input-error" placeholder="Paste or type any text here, in any language." spellcheck="true"></textarea>
+      <div class="samples"><span>Try an example:</span><button type="button" id="human-sample">Human-written</button><button type="button" id="ai-sample">AI-style</button><button type="button" id="undo-sample" hidden>Restore my text</button></div>
+      <div class="panel-foot">
+        <div class="count-line"><span id="count">0 words</span><span id="guidance">Any length up to 30,000 characters.</span></div>
+        <button type="button" class="primary" id="run"><span id="run-label">Check text</span><svg><use href="#icon-arrow"/></svg></button>
+      </div>
+      <p id="input-error" class="error" role="alert" hidden></p>
+    </div>
+
+    <section class="panel results-panel" id="results-panel" aria-label="Results" aria-busy="false">
+      <div class="panel-head"><span id="result-label">Score</span><span id="result-status" class="status-label">Ready</span></div>
+      <div id="result-content" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <p class="tool-disclosure" id="mode-disclosure"></p>
+</section>
+
+<section id="how-it-works" class="section">
+  <p class="eyebrow">THREE STEPS</p>
+  <h2>From text to a clear picture.</h2>
+  <div class="steps">
+    <article><span class="step-number">01</span><h3>Bring your words</h3><p>Paste, type or open a .txt, .md or .docx file. Files are read on your device and are not uploaded.</p></article>
+    <article><span class="step-number">02</span><h3>Check the score</h3><p>You get a 0–100 AI-likeness score, the signals behind it and a view of which sentences drove it.</p></article>
+    <article><span class="step-number">03</span><h3>Improve the text</h3><p>Humanize, fix grammar, simplify or summarize. Every change is shown against your original before you copy it.</p></article>
+  </div>
+</section>
+
+<section id="method" class="section method">
+  <div>
+    <p class="eyebrow">TRANSPARENCY</p>
+    <h2>A useful lens. <em>Never a verdict.</em></h2>
+    <p>No tool can prove who wrote a text. This one shows its working so you can judge the score for yourself.</p>
+  </div>
+  <div class="method-details">
+    <h3>How the score is built</h3>
+    <p>The detector measures nine writing-style signals: stock phrasing, sentence rhythm, formulaic openers, personal voice, lists of three, trailing “-ing” clauses, punctuation variety, short sentences and paragraph uniformity. A weighted combination is mapped to a 0–100 scale. It is a rule-based estimate, not a trained classifier.</p>
+    <h3>Where it goes wrong</h3>
+    <p>Formal, academic or heavily edited human writing can score high. Model output that has been edited by a person can score low. Short passages and languages other than English carry less evidence, so their scores are pulled toward 50 and marked low confidence.</p>
+    <h3>How rewriting works</h3>
+    <p>With no setup, rewriting uses offline rules in your browser: plainer wording, tidier mechanics and key-sentence summaries. When the site owner connects a language model, rewrites are produced by that model and checked so numbers and links are not altered.</p>
+    <p class="context-note">Do not use this score alone for academic, hiring or disciplinary decisions.</p>
+  </div>
+</section>
+
+<section id="faqs" class="section faq">
+  <div><p class="eyebrow">WORTH KNOWING</p><h2>Questions and answers.</h2></div>
+  <div class="faq-list">
+    <details><summary>Can it tell for certain that a text was written by AI?</summary><p>No. The score reflects how closely the writing matches patterns common in model output. It is evidence to weigh, with a stated confidence level, and it is sometimes wrong in both directions.</p></details>
+    <details><summary>Is my text uploaded?</summary><p>Scoring, file reading and offline rewriting all happen in your browser, and nothing is saved. Only a model-backed rewrite sends your passage to this site’s server and on to the model provider, and the tool tells you when that mode is active.</p></details>
+    <details><summary>Will humanized text pass other AI detectors?</summary><p>There is no such promise. The humanizer aims for clearer, more natural writing. Detectors disagree with each other, and none is reliable enough to guarantee an outcome.</p></details>
+    <details><summary>Which languages and files are supported?</summary><p>Any language can be scored and counted correctly, including Hindi and other Indic scripts, but the wording signals are tuned for English. You can open .txt, .md and .docx files up to 2 MB. PDF is not supported yet; copy the text out and paste it.</p></details>
+    <details><summary>What are the limits?</summary><p>Scoring accepts up to 30,000 characters. Rewriting accepts 3 to 1,500 words and up to 12,000 characters per request.</p></details>
+    <details><summary>Is it really free?</summary><p>Yes. Scoring and offline rewriting cost nothing to run. Model-backed rewriting, when enabled, is paid for by the site owner.</p></details>
+  </div>
+</section>
+</main>
+
+<footer>
+  <a class="brand" href="./"><img src="mark.svg" width="28" height="28" alt=""><span>Free AI Detector<span class="brand-dot">.</span></span></a>
+  <div class="footer-links"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="https://github.com/shanipratapsingh018/free-ai-detector/issues" target="_blank" rel="noopener noreferrer">Contact and feedback</a><a href="https://github.com/shanipratapsingh018/free-ai-detector" target="_blank" rel="noopener noreferrer">Source</a></div>
+  <span class="copyright">© <span id="year">2026</span> Free AI Detector</span>
+</footer>
+</body>
+</html>

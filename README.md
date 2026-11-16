@@ -1,83 +1,90 @@
-# Free AI Detector — Humanizer & Pattern Analysis
+# Free AI Detector
 
-Two separate tools: a real server-backed rewrite adapter and an experimental local pattern analyzer. **Rewriting needs an owner-configured OpenAI API key; no key is currently provisioned.** The UI visibly disables rewriting until configured. It does not substitute an example or make fake rewrites.
+Paste any text and get an AI-likeness score with the reasons behind it, then humanize, fix grammar, simplify or summarize the same text.
 
-## Run and check
+Everything works with no setup and no API key: scoring and rewriting run in the browser. Connecting a language model is optional and gives deeper rewrites.
 
-Node.js 18+ is required for checks and the dependency-free build:
+## What it does
+
+| Tool | With no setup | With a model connected |
+|---|---|---|
+| Detect AI | 0–100 score, nine explained signals, sentence highlights, report download | same (always local) |
+| Humanize | Offline rules: plainer wording, contractions, filler removed | Model rewrite, checked before it is shown |
+| Fix grammar | Offline rules: spacing, capitals, common typos, a/an, repeated words | Model proofreading |
+| Simplify | Offline rules: shorter words, long sentences split | Model plain-language rewrite |
+| Summarize | Extractive: keeps the key sentences word for word | Model summary |
+
+Other features: any language is counted correctly (including Hindi and other Indic scripts), `.txt`, `.md` and `.docx` upload read on the device, a word-level view of every change, light and dark themes, keyboard support (`Ctrl/⌘ + Enter` runs the current tool).
+
+## Honest limits
+
+- The score is a **rule-based estimate**, not a trained classifier. It cannot prove who wrote a text. Formal or academic human writing can score high, and edited model output can score low.
+- Wording signals are tuned for English. Other languages are scored on structure only and marked low confidence. Text under 40 words stays near 50.
+- The thresholds were tuned on the small set of passages in `tests/fixtures.js`. They have not been validated on a large labelled corpus; do that before making any accuracy claim.
+- The offline rewriting rules are conservative and English-only for wording. They will not transform a text the way a model does.
+- PDF upload is not supported.
+
+## Run it
+
+Requires Node.js 20 or newer. There are no dependencies to install.
 
 ```sh
-npm test
-npm run check
-npm run build
+npm start        # http://localhost:3000
+npm test         # 39 tests
+npm run check    # syntax check
 ```
 
-For static UI inspection only:
+To try model rewriting locally: `OPENAI_API_KEY=sk-... npm start`.
+
+## Deploy to Cloudflare Workers (free plan works)
 
 ```sh
-python3 -m http.server 3000 --directory dist
+npx wrangler login
+npx wrangler deploy
 ```
 
-The Python preview cannot rewrite because it has no API server. Deploy `dist/server/index.js` to a Cloudflare Worker-compatible host, or run a local Worker development tool with a private environment secret. Never place an API key in `dist/`, source, shell arguments, or Git. On Sites, use its supported secret configuration workflow. For `OPENAI_API_KEY`, enable OpenAI Developers and follow its `openai-platform-api-key` skill and approval flow. Do not paste a key into chat. Keep the Site private until provider billing, abuse controls, legal text, and public access are reviewed.
+That publishes the site with scoring and offline rewriting. To add model rewriting, pick one:
 
-## Runtime configuration
+- **Cloudflare Workers AI** (has a free daily allowance): in `wrangler.jsonc`, uncomment the `"ai"` and `"vars"` lines, then deploy again.
+- **OpenAI**: run `npx wrangler secret put OPENAI_API_KEY`, then deploy again. Optional variable `OPENAI_MODEL` (default `gpt-4.1-mini`).
 
-- `OPENAI_API_KEY` — required server-side secret for actual rewriting.
-- `OPENAI_MODEL` — optional server-side model name; defaults to `gpt-4.1-mini`.
+If both are set, OpenAI is used. Never put a key in a file that is committed.
 
-A paid provider account with available quota is required. The site owner pays model usage; no payments are collected in this app. The private preview's hosting login is separate from the app, which has no account system.
+Because the detector and offline tools are static files, the `public/` folder also works on any static host (GitHub Pages, Netlify). Only model rewriting needs the Worker.
 
-## How rewriting works
+## Project layout
 
-`GET /api/status` returns readiness only. `POST /api/rewrite` accepts 5–1,500 words and at most 100,000 characters in a same-origin JSON request. The server validates streamed request size, checks input, and calls OpenAI Responses with `store:false`, a timeout, and conservative copy-editing instructions. Incomplete or radically shorter/longer output is rejected. Provider errors and timeouts preserve the user's original.
+```
+public/            static site, served as-is
+  index.html, styles.css, app.js   page, styles, UI logic
+  engine.js        word and sentence segmentation, limits, counts (shared with the Worker)
+  detector.js      the scorer: signals, weights, sentence levels, report
+  rewrite-local.js offline humanize / grammar / simplify / summarize
+  diff.js          word-level diff
+  docx.js          .docx text extraction (no dependencies)
+  _headers         security headers, including the Content-Security-Policy
+worker/index.js    API: /api/status and /api/rewrite, rate limiting, output checks
+scripts/dev.mjs    local server that runs the same API handler
+tests/             unit and integration tests
+```
 
-The original stays in the editor; a revision appears beside it on desktop and below on mobile. Copy and download controls act only on the revision. Editing input or switching tools aborts pending browser requests and invalidates old results. Aborting a browser request does not guarantee cancellation of provider processing or billing. Meaning preservation is an instruction, not a guarantee; the user must review facts and details. There is no promise of passing or evading an AI detector.
+## How the score is built
 
-Human/AI-style sample buttons are explicitly labeled as examples. A separate Restore my text action restores the pre-sample original. Loading a sample does not humanize text.
+`detector.js` measures stock phrasing, sentence-length variation, formulaic openers, personal voice, lists of three, trailing “-ing” clauses, punctuation variety, short sentences and paragraph uniformity. Each signal is scaled to 0–1, combined by weight, mapped through a logistic curve and pulled toward 50 when there is little text. Weights and word lists are at the top of the file and are meant to be tuned.
 
-## Local pattern analysis
+## Safeguards on model rewriting
 
-This mode remains fully local and requires no key. It supports 50–1,500 words, measures word and sentence counts, unique words, and repeated trigrams, and exports an explanatory report without the original text. It is **not** a trained AI detector and never invents an AI percentage or accuracy claim.
+- Same-origin check, JSON only, request size capped, 3–1,500 words and 12,000 characters.
+- Rate limit of 8 requests a minute per visitor (Cloudflare rate-limit binding, with an in-memory fallback).
+- A revision is rejected if a number or URL changed, the length moved outside the allowed range, or the wording drifted away from the original. The browser then shows the offline rewrite with the reason.
+- No text is logged or stored. OpenAI requests use `store: false`.
 
-Both tools support live word counting, clipboard fallback, clear, .txt uploads up to 100 KB, UTF-8/binary validation, non-destructive errors, keyboard use, and responsive layouts.
+Before a public launch, also set a spending cap with your provider and consider adding Cloudflare Turnstile.
 
-## Source map
+## Not verified
 
-- `dist/index.html`, `dist/styles.css`: responsive ivory/forest/sage UI.
-- `dist/app.js`: input, modes, async cancellation, results, sample restoration, legal dialogs.
-- `dist/engine.js`: pure local analysis functions and report export.
-- `worker/index.js`: server-only model adapter and HTTP handling.
-- `scripts/build.mjs`: embeds static assets and adapter into `dist/server/index.js`.
-- `tests/`: count/validation tests, markup integrity checks, and mocked server integration tests.
+- No request has been made to a real OpenAI or Workers AI endpoint; both paths are covered by mocked tests only.
+- Browser tests were run in Chrome at 390, 1280 and 1440 px. Safari and Firefox were not tested.
+- The privacy and terms pages describe how the software behaves; have them reviewed before you rely on them.
 
-`npm run build` must be rerun after frontend or adapter changes. The build output contains no API secrets.
-
-## Privacy
-
-Pattern analysis never transmits text. Rewriting sends submitted text to the site server and OpenAI. This app stores no submissions or text logs and does not use browser persistence. `store:false` does not eliminate all provider retention or abuse monitoring. Google Fonts and hosting services receive ordinary network requests and may keep access metadata. Updated privacy and terms dialogs disclose this behavior. Avoid submitting sensitive material. A public support address still needs configuration.
-
-## Verification
-
-Engine, markup, syntax, and mocked rewrite integration checks pass. Live model behavior is unverified until a real key is configured. Browser-control tools are unavailable in this environment, so responsive rendering and interaction testing remain unverified. Test 390px, 768px, and 1440px widths, 200% zoom, keyboard-only operation, uploads and paste denied, mode changes during requests, sample restoration, errors, and copy/download before a public launch. Review actual rewrite quality with factual/numeric passages after connecting the model.
-
-## AdSense and design research
-
-Two hidden, empty placement hooks remain below the workspace and between supporting content sections. There are no live ads, mock ads, or approval claims. Public monetization needs policy review, unobtrusive placement, appropriate consent/disclosures, and abuse/cost controls.
-
-GPTZero, QuillBot AI detector, and ZeroGPT public page content informed the original editor-first design. Branding, mark, wording, and layout are original. No reference accuracy statistics or testimonials were copied.
-
-
-## Repository status
-
-This repository contains the last tested, deployed implementation: a working browser-local writing-pattern demo and a server-side OpenAI rewrite adapter. Twelve automated checks passed for this implementation before export. The local analyzer does not provide an AI probability. Actual rewriting requires a configured API key and paid provider quota. No credentials are included.
-
-The latest detector-first visual redesign, real detector percentage integration, PDF/DOCX upload support, and additional grammar/simplify/summarize actions are pending work and are not represented as completed features in this version.
-
-## Deploy independently to Cloudflare Workers
-
-1. Run `npm run build`.
-2. Use `npx wrangler login` to authenticate your Cloudflare account.
-3. Use `npx wrangler secret put OPENAI_API_KEY` to enter a key securely when you are ready to enable rewriting. Do not put keys in code or Git.
-4. Run `npx wrangler deploy`.
-
-The included `wrangler.jsonc` points to the generated Worker. Provider billing is separate from ChatGPT or Claude subscriptions. No live provider request has been verified for this repository.
+Fonts: DM Sans and Manrope, self-hosted under the SIL Open Font License (`public/fonts/LICENSE.txt`). The repository has no licence file for the code yet; add one if you want others to reuse it.

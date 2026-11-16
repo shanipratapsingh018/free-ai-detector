@@ -1,5 +1,23 @@
 {
+  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "free-ai-detector",
-  "main": "dist/server/index.js",
-  "compatibility_date": "2026-11-16"
+  "main": "worker/index.js",
+  "compatibility_date": "2026-11-16",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    // API routes always go to the Worker; everything else is served as a static file.
+    "run_worker_first": ["/api/*"]
+  },
+  // Per-visitor limit on model rewrites: 8 requests per 60 seconds. Works on the free plan.
+  "ratelimits": [
+    { "name": "RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 8, "period": 60 } }
+  ],
+  "observability": { "enabled": true }
+
+  // OPTION A — free model rewriting with Cloudflare Workers AI: uncomment the block below.
+  // "ai": { "binding": "AI" },
+  // "vars": { "WORKERS_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct" }
+
+  // OPTION B — OpenAI: run `npx wrangler secret put OPENAI_API_KEY` (never put the key in this file).
 }
