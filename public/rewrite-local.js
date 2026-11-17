@@ -74,7 +74,7 @@ const PLAIN_WORDING = [
   ['overall,', 'all in all,'], ['however,', 'but'], ['as a result,', 'so,'], ['on the other hand,', 'then again,'],
   // single words
   ['more meaningful', 'more worthwhile'], ['meaningful', 'real'], ['thoughtful', 'careful'], ['valuable', 'useful'], ['ongoing', 'steady'], ['various', 'different'],
-  ['require', 'need'], ['requires', 'needs'], ['required', 'needed'], ['significant', 'big'], ['transformative', 'far-reaching'],
+  ['require', 'need'], ['requires', 'needs'], ['required', 'needed'], ['significant', 'major'], ['transformative', 'far-reaching'],
   ['innovative', 'new'], ['essential', 'vital'], ['utilize', 'use'], ['utilizes', 'uses'], ['utilized', 'used'], ['utilizing', 'using'], ['utilization', 'use'],
   ['leverage', 'use'], ['leverages', 'uses'], ['leveraging', 'using'], ['leveraged', 'used'],
   ['facilitate', 'help'], ['facilitates', 'helps'], ['facilitating', 'helping'],
@@ -146,10 +146,11 @@ function fixMechanics(masked, english) {
   step(/([,;!?])(?=[\p{L}])/gu, '$1 ');
   step(/\b(\p{L}+) \1\b/giu, (m, w) => /^(?:that|had|is|very|so|no|bye|ha|ho)$/i.test(w) ? m : w);
   step(/([,;:])\1+/g, '$1');
-  step(/([!?])\1{2,}/g, '$1');
+  step(/([!?])\1+/g, '$1');
   if (english) {
     const r = applyRules(masked, TYPOS); masked = r.text; changes += r.changes;
     step(/(?<![\p{L}'’])i(?=[\s,.;:!?'’]|$)/gu, 'I');
+    step(/\b(its)(?= (?:a|an|the|not|very|been|really|so|too|just|also|going|time)\b)/gi, m => matchCase(m, "it's"));
     step(/([.!?])(?=I[\s'’])/g, '$1 ');
     step(/\b(a|an) (\p{L}[\p{L}-]*)/giu, (m, article, word) => {
       const vowelSound = (/^[aeiou]/i.test(word) && !AN_EXCEPTIONS.test(word)) || A_EXCEPTIONS.test(word);
@@ -161,6 +162,7 @@ function fixMechanics(masked, english) {
   const before = masked;
   masked = recapitalize(masked);
   // The sentence segmenter does not break before a lowercase letter, so catch "…here. see" separately.
+  if (english) masked = masked.replace(/(\d{2,})([.!?]\s+)(\p{Ll})(?=\p{Ll})/gu, (m, num, gap, ch) => num + gap + ch.toUpperCase());
   if (english) masked = masked.replace(/(\p{L}+)([.!?]\s+)(\p{Ll})/gu, (m, word, gap, ch) => /^(?:etc|viz|approx|fig|vs|al|no|eg|ie|g|e|i|m|a|p)$/i.test(word) || word.length < 3 ? m : word + gap + ch.toUpperCase());
   if (masked !== before) changes++;
   return { text: masked, changes };
@@ -177,7 +179,7 @@ const SIMPLER = [
   ['objective', 'goal'], ['objectives', 'goals'], ['optimal', 'best'], ['possess', 'have'], ['possesses', 'has'], ['primarily', 'mainly'],
   ['principal', 'main'], ['provide', 'give'], ['provides', 'gives'], ['provided', 'gave'], ['retain', 'keep'], ['substantial', 'large'],
   ['frequently', 'often'], ['inquire', 'ask'], ['locate', 'find'], ['numerous', 'many'], ['participate', 'take part'], ['remainder', 'rest'],
-  ['beneficial', 'helpful'], ['significant', 'big'], ['significantly', 'greatly'], ['however,', 'but'], ['a number of', 'several'],
+  ['beneficial', 'helpful'], ['significantly', 'greatly'], ['however,', 'but'], ['a number of', 'several'],
   ['in spite of the fact that', 'although'], ['for the purpose of', 'for'], ['has the ability to', 'can'], ['have the ability to', 'can'],
   ['is able to', 'can'], ['are able to', 'can'], ['in close proximity to', 'near'], ['the majority of', 'most'], ['on a daily basis', 'daily']
 ];

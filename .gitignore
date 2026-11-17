@@ -8,3 +8,7 @@ node_modules/
 *.zip
 *.tar.gz
 .DS_Store
+
+# labelled passages for npm run evaluate stay private
+eval/human/*.txt
+eval/ai/*.txt

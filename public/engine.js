@@ -9,7 +9,9 @@ export const LIMITS = Object.freeze({
   rewriteMinWords: 3,
   rewriteMaxWords: 1500,
   rewriteMaxChars: 12000,
-  maxFileBytes: 2000000
+  maxFileBytes: 2000000, // .txt, .md, .docx
+  maxPdfBytes: 10000000,
+  maxPdfPages: 60
 });
 
 const hasSegmenter = typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function';

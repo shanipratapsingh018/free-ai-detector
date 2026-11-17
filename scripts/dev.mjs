@@ -11,7 +11,7 @@ import { handleApi } from '../worker/index.js';
 
 const root = resolve(fileURLToPath(new URL('../public', import.meta.url)));
 const port = Number(process.env.PORT) || 3000;
-const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8', '.json': 'application/json' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8', '.json': 'application/json', '.mjs': 'text/javascript; charset=utf-8', '.png': 'image/png', '.xml': 'application/xml' };
 
 // Reuse the production headers for every path ("/*" block of public/_headers).
 const siteHeaders = {};
@@ -27,6 +27,11 @@ try {
 delete siteHeaders['Strict-Transport-Security']; // meaningless on http://localhost
 
 const env = { OPENAI_API_KEY: process.env.OPENAI_API_KEY, OPENAI_MODEL: process.env.OPENAI_MODEL };
+
+async function notFound(res) {
+  const page = await readFile(join(root, '404.html')).catch(() => 'Not found');
+  res.writeHead(404, { ...siteHeaders, 'Content-Type': 'text/html; charset=utf-8' }).end(page);
+}
 
 createServer(async (req, res) => {
   try {
@@ -47,11 +52,16 @@ createServer(async (req, res) => {
     let path = decodeURIComponent(url.pathname);
     if (path.endsWith('/')) path += 'index.html';
     const file = normalize(join(root, path));
-    if (!file.startsWith(root) || path === '/_headers') { res.writeHead(404, siteHeaders).end('Not found'); return; }
-    const body = await readFile(file);
-    res.writeHead(200, { ...siteHeaders, 'Content-Type': TYPES[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+    if (!file.startsWith(root) || path === '/_headers') return notFound(res);
+    // Like Cloudflare's asset server: "/word-counter" serves word-counter.html.
+    let body = null, served = file;
+    for (const candidate of extname(file) ? [file] : [file + '.html', join(file, 'index.html')]) {
+      try { body = await readFile(candidate); served = candidate; break; } catch { /* try the next candidate */ }
+    }
+    if (body === null) return notFound(res);
+    res.writeHead(200, { ...siteHeaders, 'Content-Type': TYPES[extname(served)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
     res.end(req.method === 'HEAD' ? undefined : body);
-  } catch (error) {
-    res.writeHead(error.code === 'ENOENT' || error.code === 'EISDIR' ? 404 : 500, siteHeaders).end(error.code === 'ENOENT' || error.code === 'EISDIR' ? 'Not found' : 'Server error');
+  } catch {
+    res.writeHead(500, siteHeaders).end('Server error');
   }
 }).listen(port, () => console.log(`Free AI Detector running at http://localhost:${port}  (model rewriting: ${env.OPENAI_API_KEY ? 'OpenAI' : 'off, using offline rules'})`));

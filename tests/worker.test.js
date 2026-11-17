@@ -74,6 +74,9 @@ test('rejects revisions that drift, drop numbers or URLs, or change length too m
   assert.equal(checkRevision(original, 'I’d like this text to sound more natural when people read it in 2026.', 'humanize'), null);
   assert.equal(checkRevision('In 2020 sales rose 5%. '.repeat(30), 'Sales rose 5% in 2020.', 'summarize'), null);
   assert.equal(checkRevision('In 2020 sales rose 5%. '.repeat(30), 'Sales rose 9% in 2020.', 'summarize'), 'a number not in the original appeared');
+  // The same number written another way is not a change.
+  assert.equal(checkRevision('The grant was 3,500 rupees for 2.50 years of work in total.', 'The grant was 3500 rupees for 2.5 years of work overall.', 'humanize'), null);
+  assert.equal(checkRevision('The grant was 3,500 rupees for 2.50 years of work in total.', 'The grant was 3,600 rupees for 2.5 years of work overall.', 'humanize'), 'a number was changed or dropped');
 });
 
 test('maps provider failures to clear errors', async () => {

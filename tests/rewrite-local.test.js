@@ -54,3 +54,8 @@ test('diff marks additions and removals and rebuilds both sides', () => {
   assert.equal(runs.filter(r => r.type !== 'remove').map(r => r.text).join(''), after);
   assert.deepEqual(diffWords('same', 'same'), [{ type: 'same', text: 'same' }]);
 });
+
+test('grammar handles its/it\'s, doubled marks and capitals after a year', () => {
+  assert.equal(rewriteLocally('its a nice day isnt it ?? we met in 2020. he said yes.', 'grammar').text, "It's a nice day isn't it? We met in 2020. He said yes.");
+  assert.equal(rewriteLocally('The dog wagged its tail at the door.', 'grammar').text, 'The dog wagged its tail at the door.');
+});

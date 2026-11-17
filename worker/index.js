@@ -55,7 +55,12 @@ async function allowed(request, env) {
 }
 
 /* ---------- output checks ---------- */
-const numbersIn = text => (text.match(/\d+(?:[.,]\d+)*/g) || []).map(n => n.replace(/[.,]$/, ''));
+// Numbers are compared by value-like form, so "3,500" and "3500" (or "2.50" and "2.5") count as the same number.
+const numbersIn = text => (text.match(/\d+(?:[.,]\d+)*/g) || []).map(n => {
+  let v = n.replace(/,(?=\d{3}(?:\D|$))/g, '').replace(/,/g, '.');
+  if (v.includes('.')) v = v.replace(/0+$/, '').replace(/\.$/, '');
+  return v.replace(/^0+(?=\d)/, '');
+});
 const urlsIn = text => (text.match(/https?:\/\/[^\s<>"')\]]+/g) || []).map(u => u.replace(/[.,;:!?]+$/, ''));
 
 /** Returns a reason string when a model revision must be rejected, otherwise null. */

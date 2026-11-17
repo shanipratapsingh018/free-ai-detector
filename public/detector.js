@@ -8,7 +8,7 @@
  */
 import { words, sentences, paragraphs, detectLanguage, basicStats, validateScore, mean, deviation, clamp } from './engine.js';
 
-export const ENGINE_VERSION = 'heuristic-2.0';
+export const ENGINE_VERSION = 'heuristic-2.1';
 
 // Wording that turns up far more often in model output than in everyday human prose.
 const STOCK_WORDS = [
@@ -39,6 +39,19 @@ const VOICE_RE = /\b(?:i|me|my|mine|myself|we|us|our|ours)\b|\b\w+(?:n['’]t|['
 const TRIAD_RE = /\b[\w'’-]+(?: [\w'’-]+){0,3}, [\w'’-]+(?: [\w'’-]+){0,3},? (?:and|or) [\w'’-]+/gi;
 const PARTICIPLE_RE = /, (?:\w+ly )?(?!including|according|regarding|during|being|having)\w{4,}ing\b|^[\s"“]*by \w+ing\b/gi;
 const INFORMAL_PUNCT_RE = /[?!(]|\.\.\.|…/g;
+// Boilerplate that chat assistants wrap around an answer.
+const ASSISTANT_RE = /(?<![\p{L}])(?:sure(?:!| thing)|certainly!|absolutely!|great question|happy to help|i(?:'|’)d be happy to|here(?:'|’)s a (?:quick|brief|simple|short)|here are (?:some|a few|the|\w+ (?:tips|ways|steps|ideas))|want me to|would you like me to|let me know if|i hope this helps|hope (?:this|that) helps|feel free to|as an ai\b|quick rundown|break (?:it|this|that|down the)|tl;dr)/giu;
+// Concrete detail: figures, citations and names in mid-sentence.
+const SPECIFIC_RE = /\d+(?:[.,]\d+)*%?|\bet al\b|(?<=[\p{Ll},;] )\p{Lu}\p{Ll}{2,}/gu;
+const TERMINAL_RE = /[.!?…।:;,]["”’)\]]*$/;
+const BULLET_RE = /^(?:[-*•▪◦–—]|\d{1,3}[.)])\s/;
+
+/** Headings and short list items are layout, not prose: they must not count as "short sentences". */
+function isStructural(sentence) {
+  const trimmed = sentence.text.trim();
+  if (sentence.words.length > 12 || TERMINAL_RE.test(trimmed)) return false;
+  return /\n\s*$/.test(sentence.text) || BULLET_RE.test(trimmed);
+}
 
 const SIGNALS = {
   stock: { label: 'Stock phrasing', weight: 0.24, english: true },
@@ -49,6 +62,7 @@ const SIGNALS = {
   participles: { label: 'Trailing “-ing” clauses', weight: 0.08, english: true, minSentences: 3 },
   punctuation: { label: 'Punctuation variety', weight: 0.07, minSentences: 3 },
   shortSentences: { label: 'Short sentences', weight: 0.05, minSentences: 4 },
+  specificity: { label: 'Concrete detail', weight: 0.10 },
   paragraphShape: { label: 'Paragraph uniformity', weight: 0.04, minParagraphs: 3 }
 };
 
@@ -64,6 +78,7 @@ function sentenceLevel(sentence, english, meanLength) {
     if (OPENER_RE.test(sentence.text)) { points += 1; reasons.push('formulaic opener'); }
     if (count(sentence.text, TRIAD_RE)) { points += 0.9; reasons.push('list of three'); }
     if (count(sentence.text, PARTICIPLE_RE)) { points += 0.7; reasons.push('trailing “-ing” clause'); }
+    if (count(sentence.text, ASSISTANT_RE)) { points += 1.5; reasons.push('assistant-style phrase'); }
     if (count(sentence.text, VOICE_RE)) { points -= 1.1; }
   }
   if (count(sentence.text, INFORMAL_PUNCT_RE)) points -= 0.6;
@@ -84,9 +99,13 @@ export function scoreText(text) {
   const tokens = words(text);
   const language = detectLanguage(text, tokens);
   const english = language.english;
-  const sents = sentences(text).filter(s => s.words.length);
+  const allSentences = sentences(text);
+  const withWords = allSentences.filter(s => s.words.length);
+  const prose = withWords.filter(s => !isStructural(s));
+  // Score prose only; fall back to every line when the text is nothing but headings or list items.
+  const sents = prose.length ? prose : withWords;
   const lengths = sents.map(s => s.words.length);
-  const paras = paragraphs(text);
+  const paras = paragraphs(text).filter(p => words(p).length > 12);
   const wordCount = tokens.length;
   const per100 = n => wordCount ? n / wordCount * 100 : 0;
   const perSentence = n => sents.length ? n / sents.length : 0;
@@ -117,7 +136,10 @@ export function scoreText(text) {
   // 8. Very short sentences.
   const shortShare = perSentence(lengths.filter(n => n <= 6).length);
   raw.shortSentences = { strength: clamp(1 - shortShare / 0.22), detail: `${Math.round(shortShare * 100)}% of sentences have six words or fewer`, hint: 'Models rarely write very short sentences.' };
-  // 9. Paragraph uniformity.
+  // 9. Concrete detail: figures, citations and names pull the score down.
+  const specificRate = per100(count(text, SPECIFIC_RE));
+  raw.specificity = { strength: clamp(1 - specificRate / 4.5), detail: `${specificRate.toFixed(1)} figures, citations or mid-sentence names per 100 words`, hint: 'Generic model prose is light on numbers, sources and named people or places.' };
+  // 10. Paragraph uniformity.
   const paraLengths = paras.map(p => words(p).length);
   const paraCv = mean(paraLengths) ? deviation(paraLengths) / mean(paraLengths) : 0;
   raw.paragraphShape = { strength: clamp((0.4 - paraCv) / 0.4), detail: `Paragraph lengths vary by ${(paraCv * 100).toFixed(0)}%`, hint: 'Evenly sized paragraphs are typical of model output.' };
@@ -130,27 +152,39 @@ export function scoreText(text) {
     total += raw[id].strength * def.weight; weightSum += def.weight;
     signals.push({ id, label: def.label, strength: +raw[id].strength.toFixed(2), detail: raw[id].detail, hint: raw[id].hint });
   }
-  const average = weightSum ? total / weightSum : 0.5;
+  let average = weightSum ? total / weightSum : 0.5;
+  // Assistant boilerplate ("Sure! Here's a quick rundown…") is strong evidence when present, and says nothing when absent.
+  const assistantHits = english ? count(text, ASSISTANT_RE) : 0;
+  if (assistantHits) {
+    const strength = clamp(assistantHits / 2);
+    average = Math.min(1, Math.max(average + 0.2 * strength, 0.3 + 0.35 * strength));
+    signals.push({ id: 'assistant', label: 'Assistant-style phrasing', strength: +strength.toFixed(2), detail: `${assistantHits} chat-assistant ${assistantHits === 1 ? 'phrase' : 'phrases'} such as “Sure!”, “Here’s a quick…” or “Let me know if…”`, hint: 'These wrappers are typical of replies copied straight from a chatbot.' });
+  }
   // Stretch the weighted average onto 0–1; centre and slope were tuned on the bundled test passages.
   const stretched = 1 / (1 + Math.exp(-9 * (average - 0.5)));
 
   // Short or non-English passages carry little evidence, so the score is pulled toward 50.
   const lengthTrust = clamp(Math.sqrt(wordCount / 160));
   const coverage = clamp(weightSum / 0.75);
-  const trust = lengthTrust * (english ? 1 : 0.6) * (0.5 + 0.5 * coverage);
+  // Text with almost no sentence boundaries, or made of a few repeated words, gives the signals nothing to measure.
+  const uniqueShare = new Set(tokens.map(t => t.toLowerCase())).size / wordCount;
+  const degenerate = wordCount >= 40 && (sents.length < 3 || uniqueShare < 0.15);
+  const trust = lengthTrust * (english ? 1 : 0.6) * (0.5 + 0.5 * coverage) * (degenerate ? 0.25 : 1);
   const score = Math.round(clamp(50 + (stretched * 100 - 50) * trust, 0, 100));
 
-  let confidence, confidenceNote;
-  if (wordCount < 40) { confidence = 'Very low'; confidenceNote = 'Under 40 words. There is too little text to judge, so the score stays near 50.'; }
-  else if (!english) { confidence = 'Low'; confidenceNote = 'Wording signals are tuned for English. Only structural signals were used for this text.'; }
-  else if (wordCount < 120) { confidence = 'Low'; confidenceNote = 'Under 120 words. Treat the score as a rough hint.'; }
-  else if (wordCount < 300) { confidence = 'Moderate'; confidenceNote = 'A few hundred more words would make the estimate steadier.'; }
-  else { confidence = 'Fair'; confidenceNote = 'Enough text for the signals to settle. This is still an estimate, not proof.'; }
+  let confidence, confidenceNote, confidenceKey;
+  if (wordCount < 40) { confidenceKey = 'tooShort'; confidence = 'Very low'; confidenceNote = 'Under 40 words. There is too little text to judge, so the score stays near 50.'; }
+  else if (degenerate) { confidenceKey = 'degenerate'; confidence = 'Very low'; confidenceNote = 'This text has too few separate sentences or too much repetition for the signals to mean anything.'; }
+  else if (!english) { confidenceKey = 'nonEnglish'; confidence = 'Low'; confidenceNote = 'Wording signals are tuned for English. Only structural signals were used for this text.'; }
+  else if (wordCount < 120) { confidenceKey = 'short'; confidence = 'Low'; confidenceNote = 'Under 120 words. Treat the score as a rough hint.'; }
+  else if (wordCount < 300) { confidenceKey = 'medium'; confidence = 'Moderate'; confidenceNote = 'A few hundred more words would make the estimate steadier.'; }
+  else { confidenceKey = 'fair'; confidence = 'Fair'; confidenceNote = 'Enough text for the signals to settle. This is still an estimate, not proof.'; }
 
   const band = score >= 65 ? 'Mostly AI-like patterns' : score >= 40 ? 'Mixed or uncertain' : 'Mostly human-like patterns';
   const bandKey = score >= 65 ? 'high' : score >= 40 ? 'medium' : 'low';
 
-  const sentenceView = sentences(text).map(s => {
+  const sentenceView = allSentences.map(s => {
+    if (s.words.length && isStructural(s) && prose.length) return { text: s.text, level: 'none', reasons: [] };
     const { level, reasons } = sentenceLevel(s, english, meanLength);
     return { text: s.text, level: wordCount < 40 ? (level === 'none' ? 'none' : 'low') : level, reasons };
   });
@@ -158,9 +192,9 @@ export function scoreText(text) {
 
   return Object.freeze({
     version: ENGINE_VERSION,
-    score, band, bandKey, confidence, confidenceNote,
+    score, band, bandKey, confidence, confidenceKey, confidenceNote,
     language: language.label, english,
-    signals: signals.sort((a, b) => b.strength * SIGNALS[b.id].weight - a.strength * SIGNALS[a.id].weight),
+    signals: signals.sort((a, b) => b.strength * (SIGNALS[b.id]?.weight ?? 0.2) - a.strength * (SIGNALS[a.id]?.weight ?? 0.2)),
     sentences: sentenceView,
     flaggedSentences: flagged,
     stats: basicStats(text),
