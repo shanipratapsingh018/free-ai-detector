@@ -43,10 +43,13 @@ npx wrangler login
 npx wrangler deploy
 ```
 
-That publishes the site with scoring and offline rewriting. To add model rewriting, pick one:
+That publishes the site with scoring, offline rewriting and model rewriting through **Cloudflare Workers AI**, which is switched on in `wrangler.jsonc`. It needs no API key and uses your Cloudflare account's free daily allowance; when the allowance runs out, the site falls back to the offline rules until the next day.
 
-- **Cloudflare Workers AI** (has a free daily allowance): in `wrangler.jsonc`, uncomment the `"ai"` and `"vars"` lines, then deploy again.
-- **OpenAI**: run `npx wrangler secret put OPENAI_API_KEY`, then deploy again. Optional variable `OPENAI_MODEL` (default `gpt-4.1-mini`).
+- To change the model, edit `WORKERS_AI_MODEL` in `wrangler.jsonc`.
+- To turn model rewriting off, delete the `"ai"` and `"vars"` lines.
+- To use **OpenAI** instead, run `npx wrangler secret put OPENAI_API_KEY`, then deploy again. Optional variable `OPENAI_MODEL` (default `gpt-4.1-mini`).
+
+`npm start` on your own computer has no Workers AI, so it uses the offline rules unless `OPENAI_API_KEY` is set. `npx wrangler dev` runs locally with Workers AI after you log in.
 
 If both are set, OpenAI is used. Never put a key in a file that is committed.
 

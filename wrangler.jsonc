@@ -13,11 +13,11 @@
   "ratelimits": [
     { "name": "RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 8, "period": 60 } }
   ],
+  // Free model rewriting through Cloudflare Workers AI (no API key; uses your account's free daily allowance).
+  "ai": { "binding": "AI" },
+  "vars": { "WORKERS_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct" },
   "observability": { "enabled": true }
 
-  // OPTION A — free model rewriting with Cloudflare Workers AI: uncomment the block below.
-  // "ai": { "binding": "AI" },
-  // "vars": { "WORKERS_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct" }
-
-  // OPTION B — OpenAI: run `npx wrangler secret put OPENAI_API_KEY` (never put the key in this file).
+  // To use OpenAI instead: run `npx wrangler secret put OPENAI_API_KEY` (never put the key in this file).
+  // When that secret exists it takes priority over Workers AI.
 }

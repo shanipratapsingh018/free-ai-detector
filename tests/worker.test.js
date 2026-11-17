@@ -57,12 +57,12 @@ test('sends the right instructions to OpenAI and returns the revision', async ()
 
 test('uses a Workers AI binding when no OpenAI key is set, and strips code fences', async () => {
   let seen;
-  const ai = { AI: { async run(model, input) { seen = { model, input }; return { response: '```\nI’d like this text to sound more natural when people read it in 2026.\n```' }; } } };
+  const ai = { AI: { async run(model, input) { seen = { model, input }; return { response: 'Here is the rewritten text:\n\n```\nI’d like this text to sound more natural when people read it in 2026.\n```' }; } } };
   const response = await handleApi(request({ text: original }), ai, fail);
   assert.equal(response.status, 200);
   assert.equal(seen.model, '@cf/meta/llama-3.1-8b-instruct'); assert.equal(seen.input.messages[1].content, original);
   const data = await response.json();
-  assert.equal(data.provider, 'workers-ai'); assert.ok(!data.text.includes('```'));
+  assert.equal(data.provider, 'workers-ai'); assert.ok(!data.text.includes('```')); assert.ok(data.text.startsWith('I’d like'));
 });
 
 test('rejects revisions that drift, drop numbers or URLs, or change length too much', async () => {

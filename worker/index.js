@@ -107,7 +107,8 @@ async function callWorkersAI(env, instructions, text) {
   const output = typeof result === 'string' ? result : (result?.response ?? result?.choices?.[0]?.message?.content ?? '');
   return { output: String(output).trim() };
 }
-const stripFences = s => s.replace(/^```[\w-]*\n?/, '').replace(/\n?```$/, '').trim();
+// Small models sometimes wrap the answer in a code fence or add a lead-in line such as "Here is the rewritten text:".
+const stripFences = s => s.replace(/^(?:here(?:'s| is)|sure|certainly)[^\n]{0,80}:\s*\n+/i, '').replace(/^```[\w-]*\n?/, '').replace(/\n?```$/, '').trim();
 
 /* ---------- API ---------- */
 export async function handleApi(request, env, fetcher = fetch) {
