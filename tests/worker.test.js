@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import worker, { handleApi, checkRevision, memoryLimit, providerFor } from '../worker/index.js';
+import worker, { handleApi, checkRevision, memoryLimit, providerFor, textFromWorkersAI, WORKERS_AI_MODELS } from '../worker/index.js';
 
 let ip = 0;
 const request = (body, { origin = 'https://site.test', raw = false } = {}) => new Request('https://site.test/api/rewrite', {
@@ -60,7 +60,7 @@ test('uses a Workers AI binding when no OpenAI key is set, and strips code fence
   const ai = { AI: { async run(model, input) { seen = { model, input }; return { response: 'Here is the rewritten text:\n\n```\nI’d like this text to sound more natural when people read it in 2026.\n```' }; } } };
   const response = await handleApi(request({ text: original }), ai, fail);
   assert.equal(response.status, 200);
-  assert.equal(seen.model, '@cf/meta/llama-3.1-8b-instruct'); assert.equal(seen.input.messages[1].content, original);
+  assert.equal(seen.model, WORKERS_AI_MODELS[0]); assert.equal(seen.input.messages[1].content, original);
   const data = await response.json();
   assert.equal(data.provider, 'workers-ai'); assert.ok(!data.text.includes('```')); assert.ok(data.text.startsWith('I’d like'));
 });
@@ -94,4 +94,23 @@ test('rate limits repeated requests from one address', async () => {
 test('static requests are passed to the assets binding', async () => {
   const response = await worker.fetch(new Request('https://site.test/index.html'), { ASSETS: { fetch: async () => new Response('page') } });
   assert.equal(await response.text(), 'page');
+});
+
+test('falls back to the next Workers AI model when one is retired, and reads every response shape', async () => {
+  const tried = [];
+  const revised = 'I’d like this text to sound more natural when people read it in 2026.';
+  const ai = { WORKERS_AI_MODEL: '@cf/retired/model', AI: { async run(model) { tried.push(model); if (tried.length < 3) throw Error('410 Gone'); return { choices: [{ message: { content: revised } }] }; } } };
+  const quiet = console.error; console.error = () => {};
+  try {
+    const response = await handleApi(request({ text: original }), ai, fail);
+    assert.equal(response.status, 200);
+    assert.deepEqual(tried, ['@cf/retired/model', WORKERS_AI_MODELS[0], WORKERS_AI_MODELS[1]]);
+    assert.equal((await response.json()).text, revised);
+    const dead = { AI: { async run() { throw Error('410 Gone'); } } };
+    assert.equal((await handleApi(request({ text: original }), dead, fail)).status, 502);
+  } finally { console.error = quiet; }
+  assert.equal(textFromWorkersAI('a'), 'a');
+  assert.equal(textFromWorkersAI({ response: 'b' }), 'b');
+  assert.equal(textFromWorkersAI({ output: [{ type: 'reasoning', content: [{ text: 'x' }] }, { type: 'message', content: [{ type: 'output_text', text: 'c' }] }] }), 'c');
+  assert.equal(textFromWorkersAI({ unexpected: true }), '');
 });

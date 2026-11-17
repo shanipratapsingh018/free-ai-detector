@@ -30,7 +30,7 @@ Requires Node.js 20 or newer. There are no dependencies to install.
 
 ```sh
 npm start        # http://localhost:3000
-npm test         # 39 tests
+npm test         # 40 tests
 npm run check    # syntax check
 ```
 
@@ -45,7 +45,7 @@ npx wrangler deploy
 
 That publishes the site with scoring, offline rewriting and model rewriting through **Cloudflare Workers AI**, which is switched on in `wrangler.jsonc`. It needs no API key and uses your Cloudflare account's free daily allowance; when the allowance runs out, the site falls back to the offline rules until the next day.
 
-- To change the model, edit `WORKERS_AI_MODEL` in `wrangler.jsonc`.
+- To change the model, edit `WORKERS_AI_MODEL` in `wrangler.jsonc`. Cloudflare retires models from time to time; if the configured one stops working, the Worker tries the fallbacks listed in `worker/index.js`. Run `npx wrangler tail` to see which model failed and why.
 - To turn model rewriting off, delete the `"ai"` and `"vars"` lines.
 - To use **OpenAI** instead, run `npx wrangler secret put OPENAI_API_KEY`, then deploy again. Optional variable `OPENAI_MODEL` (default `gpt-4.1-mini`).
 

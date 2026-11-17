@@ -4,7 +4,7 @@
  * The site works with no configuration (scoring and offline rewriting run in the browser).
  * Model rewriting switches on when ONE of these is configured:
  *   - OPENAI_API_KEY secret (uses OPENAI_MODEL, default gpt-4.1-mini)
- *   - a Workers AI binding named AI (uses WORKERS_AI_MODEL, default @cf/meta/llama-3.1-8b-instruct)
+ *   - a Workers AI binding named AI (uses WORKERS_AI_MODEL, then the fallbacks in WORKERS_AI_MODELS)
  * No credentials or user text are logged or stored here.
  */
 import { words, validateRewrite, LIMITS } from '../public/engine.js';
@@ -99,13 +99,42 @@ async function callOpenAI(env, fetcher, instructions, text) {
     .filter(part => part.type === 'output_text').map(part => part.text).join('\n').trim();
   return { output };
 }
+// Cloudflare retires Workers AI models from time to time, so the configured model is followed by fallbacks.
+export const WORKERS_AI_MODELS = ['@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/meta/llama-4-scout-17b-16e-instruct', '@cf/openai/gpt-oss-20b'];
+
+/** Workers AI models answer in several shapes; pull the text out of whichever one came back. */
+export function textFromWorkersAI(result) {
+  if (typeof result === 'string') return result;
+  if (!result || typeof result !== 'object') return '';
+  if (typeof result.response === 'string') return result.response;
+  if (typeof result.output_text === 'string') return result.output_text;
+  const chat = result.choices?.[0]?.message?.content;
+  if (typeof chat === 'string') return chat;
+  if (Array.isArray(result.output)) {
+    return result.output.filter(item => item?.type === 'message').flatMap(item => item.content || [])
+      .filter(part => typeof part?.text === 'string').map(part => part.text).join('\n');
+  }
+  if (result.response && typeof result.response === 'object') return textFromWorkersAI(result.response);
+  return '';
+}
+
 async function callWorkersAI(env, instructions, text) {
-  const result = await env.AI.run(env.WORKERS_AI_MODEL || '@cf/meta/llama-3.1-8b-instruct', {
-    messages: [{ role: 'system', content: instructions }, { role: 'user', content: text }],
-    max_tokens: 4096, temperature: 0.6
-  });
-  const output = typeof result === 'string' ? result : (result?.response ?? result?.choices?.[0]?.message?.content ?? '');
-  return { output: String(output).trim() };
+  const models = [...new Set([env.WORKERS_AI_MODEL, ...WORKERS_AI_MODELS].filter(Boolean))];
+  let lastError;
+  for (const model of models) {
+    try {
+      const result = await env.AI.run(model, {
+        messages: [{ role: 'system', content: instructions }, { role: 'user', content: text }],
+        max_tokens: 4096, temperature: 0.6
+      });
+      const output = textFromWorkersAI(result).trim();
+      if (output) return { output };
+      lastError = new Error('empty response');
+    } catch (error) { lastError = error; }
+    // Logged for `npx wrangler tail`. Only the model name and the provider's message, never the user's text.
+    console.error(`Workers AI model ${model} failed: ${String(lastError?.message || lastError).slice(0, 300)}`);
+  }
+  throw lastError;
 }
 // Small models sometimes wrap the answer in a code fence or add a lead-in line such as "Here is the rewritten text:".
 const stripFences = s => s.replace(/^(?:here(?:'s| is)|sure|certainly)[^\n]{0,80}:\s*\n+/i, '').replace(/^```[\w-]*\n?/, '').replace(/\n?```$/, '').trim();

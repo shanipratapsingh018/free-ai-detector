@@ -15,7 +15,7 @@
   ],
   // Free model rewriting through Cloudflare Workers AI (no API key; uses your account's free daily allowance).
   "ai": { "binding": "AI" },
-  "vars": { "WORKERS_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct" },
+  "vars": { "WORKERS_AI_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast" },
   "observability": { "enabled": true }
 
   // To use OpenAI instead: run `npx wrangler secret put OPENAI_API_KEY` (never put the key in this file).
