@@ -14,6 +14,6 @@ export const REPO_URL = 'https://github.com/shanipratapsingh018/free-ai-detector
 export const CF_ANALYTICS_TOKEN = '';
 
 // Google Search Console "HTML tag" verification code (the content="…" value). Optional.
-export const GOOGLE_SITE_VERIFICATION = '';
+export const GOOGLE_SITE_VERIFICATION = 'yNURirwz19xrQx1Da00CnOoxdIhoWcqXe3rfygFZjoI';
 
 export const UPDATED = '2026-11-17';
