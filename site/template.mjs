@@ -70,6 +70,7 @@ function head(page, ui, extraSchema = []) {
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/mark.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preload" href="/fonts/dm-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/styles.css">${page.kind === 'tool' ? '\n<script type="module" src="/app.js"></script>' : ''}${CF_ANALYTICS_TOKEN ? `\n<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${esc(CF_ANALYTICS_TOKEN)}"}'></script>` : ''}
 ${extraSchema.map(jsonLd).join('\n')}
@@ -156,6 +157,8 @@ function toolPage(page) {
     applicationCategory: 'UtilitiesApplication', operatingSystem: 'Any', browserRequirements: 'Requires JavaScript', inLanguage: page.lang || 'en', isAccessibleForFree: true,
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
   }];
+  // The home page tells search engines which image is the site's logo.
+  if (page.path === '') schema.push({ '@context': 'https://schema.org', '@type': 'Organization', name: SITE_NAME, url: SITE_URL, logo: urlFor('icon-512.png') });
   if (page.faqs?.length) schema.push({ '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: page.faqs.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: stripTags(a) } })) });
   return `${head(page, ui, schema)}
 <body data-action="${page.action}">
